@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEGA 記帳工具</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a; --surface: #111827; --surface2: #1a2234; --border: #1e2d45;
+    --teal: #00d4aa; --teal-dim: #00d4aa22; --red: #ff4d6d; --red-dim: #ff4d6d22;
+    --gold: #f5c842; --text: #e8edf5; --muted: #4a6080; --success: #00e5a0; --orange: #fb923c;
+    --fee: #f97316;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 40px 40px; opacity: 0.3; pointer-events: none; z-index: 0; }
+  .app { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+  .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 12px; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 42px; height: 42px; background: linear-gradient(135deg, var(--teal), #00a88a); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 0 20px var(--teal-dim); }
+  .logo-text h1 { font-size: 18px; font-weight: 900; color: var(--text); }
+  .logo-text p { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono'; }
+  .top-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .top-date { font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono'; }
+  .sync-status { font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; }
+  .sync-status.online { background: #00d4aa22; color: var(--teal); border: 1px solid var(--teal); }
+  .sync-status.offline { background: #ff4d6d22; color: var(--red); border: 1px solid var(--red); }
+  .btn-settle { padding: 10px 20px; background: linear-gradient(135deg, #d97706, #b45309); color: white; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; font-family: 'Noto Sans TC', sans-serif; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 16px #d9770633; }
+  .btn-settle:hover { transform: translateY(-2px); }
+  .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; position: relative; overflow: hidden; }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .stat-card.income::before { background: var(--teal); }
+  .stat-card.expense::before { background: var(--red); }
+  .stat-card.fee::before { background: var(--fee); }
+  .stat-card.profit::before { background: var(--gold); }
+  .stat-card.count::before { background: #7c8cf8; }
+  .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+  .stat-value { font-size: 18px; font-weight: 900; font-family: 'JetBrains Mono'; line-height: 1; }
+  .stat-card.income .stat-value { color: var(--teal); }
+  .stat-card.expense .stat-value { color: var(--red); }
+  .stat-card.fee .stat-value { color: var(--fee); }
+  .stat-card.profit .stat-value { color: var(--gold); }
+  .stat-card.count .stat-value { color: #7c8cf8; }
+  .stat-sub { font-size: 10px; color: var(--muted); margin-top: 6px; font-family: 'JetBrains Mono'; }
+  .main-grid { display: grid; grid-template-columns: 360px 1fr; gap: 16px; }
+  .input-panel { display: flex; flex-direction: column; gap: 12px; }
+  .panel-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .panel-header h2 { font-size: 13px; font-weight: 700; }
+  .panel-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .income-dot { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+  .expense-dot { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .panel-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .form-row { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 0.5px; }
+  .form-select, .form-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; font-family: 'Noto Sans TC', sans-serif; padding: 9px 12px; outline: none; transition: border-color 0.2s; }
+  .form-select:focus, .form-input:focus { border-color: var(--teal); }
+  .form-select option { background: var(--surface); }
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .btn-submit { width: 100%; padding: 12px; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; font-family: 'Noto Sans TC', sans-serif; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-income { background: linear-gradient(135deg, #00b890, #009e7a); color: white; }
+  .btn-income:hover { transform: translateY(-2px); }
+  .btn-expense { background: linear-gradient(135deg, #e03050, #c02040); color: white; }
+  .btn-expense:hover { transform: translateY(-2px); }
+  .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .records-panel { display: flex; flex-direction: column; gap: 12px; }
+  .bank-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 16px 18px; }
+  .bank-chip { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .bank-chip-name { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .bank-chip-amount { font-size: 14px; font-weight: 700; color: var(--teal); font-family: 'JetBrains Mono'; }
+  .bank-chip-profit { font-size: 10px; color: var(--success); font-family: 'JetBrains Mono'; }
+  .records-list { padding: 0 18px 16px; display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+  .records-list::-webkit-scrollbar { width: 4px; }
+  .records-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .record-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; animation: slideIn 0.2s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .record-type-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .record-type-dot.income { background: var(--teal); }
+  .record-type-dot.expense { background: var(--red); }
+  .record-info { flex: 1; min-width: 0; }
+  .record-bank { font-size: 13px; font-weight: 700; }
+  .record-meta { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono'; margin-top: 2px; }
+  .record-numbers { text-align: right; flex-shrink: 0; }
+  .record-amount { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono'; }
+  .record-amount.income { color: var(--teal); }
+  .record-amount.expense { color: var(--red); }
+  .record-profit { font-size: 11px; color: var(--success); font-family: 'JetBrains Mono'; }
+  .record-fee { font-size: 10px; color: var(--fee); font-family: 'JetBrains Mono'; }
+  .record-del { color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px; border-radius: 4px; transition: all 0.15s; flex-shrink: 0; }
+  .record-del:hover { color: var(--red); background: var(--red-dim); }
+  .empty-state { text-align: center; padding: 40px 0; color: var(--muted); font-size: 13px; }
+  .empty-state .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.5; }
+  .records-footer { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .btn-clear { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; font-size: 11px; padding: 6px 12px; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; transition: all 0.2s; }
+  .btn-clear:hover { border-color: var(--red); color: var(--red); }
+  .history-list { padding: 0 18px 16px; display: flex; flex-direction: column; gap: 8px; max-height: 440px; overflow-y: auto; }
+  .history-list::-webkit-scrollbar { width: 4px; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .history-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; cursor: pointer; transition: border-color 0.2s; }
+  .history-item:hover, .history-item.expanded { border-color: var(--orange); }
+  .history-top { display: flex; justify-content: space-between; align-items: center; }
+  .history-date { font-size: 13px; font-weight: 700; color: var(--orange); font-family: 'JetBrains Mono'; }
+  .history-summary { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .history-profit { font-size: 14px; font-weight: 700; color: var(--gold); font-family: 'JetBrains Mono'; }
+  .history-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: none; font-size: 11px; color: var(--muted); line-height: 1.8; font-family: 'JetBrains Mono'; white-space: pre-wrap; }
+  .history-item.expanded .history-detail { display: block; }
+  .tab-bar { display: flex; gap: 4px; padding: 14px 18px 0; flex-wrap: wrap; }
+  .tab-btn { padding: 6px 14px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-family: 'Noto Sans TC', sans-serif; transition: all 0.2s; }
+  .tab-btn.active { background: var(--teal-dim); border-color: var(--teal); color: var(--teal); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .balance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px 18px 16px; }
+  .balance-chip { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .balance-chip-name { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .balance-chip-amount { font-size: 15px; font-weight: 700; font-family: 'JetBrains Mono'; margin-bottom: 6px; }
+  .balance-chip-amount.pos { color: var(--teal); }
+  .balance-chip-amount.neg { color: var(--red); }
+  .balance-chip-amount.zero { color: var(--muted); }
+  .btn-edit-bal { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; font-size: 10px; padding: 2px 8px; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; transition: all 0.15s; }
+  .btn-edit-bal:hover { border-color: var(--teal); color: var(--teal); }
+  #toast { position: fixed; bottom: 28px; right: 28px; background: var(--surface); border: 1px solid var(--teal); border-radius: 10px; padding: 12px 20px; font-size: 13px; color: var(--teal); box-shadow: 0 8px 32px #00000055; transform: translateY(80px); opacity: 0; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 9999; font-weight: 600; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.error { border-color: var(--red); color: var(--red); }
+  @media (max-width: 900px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 760px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .main-grid { grid-template-columns: 1fr; } .bank-stats-grid { grid-template-columns: repeat(2, 1fr); } .balance-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top-bar">
+    <div class="logo">
+      <div class="logo-icon">💰</div>
+      <div class="logo-text">
+        <h1>MEGA 記帳工具</h1>
+        <p id="today-str">載入中...</p>
+      </div>
+    </div>
+    <div class="top-right">
+      <span class="sync-status offline" id="sync-status">⏳ 連線中...</span>
+      <div class="top-date" id="clock">--:--:--</div>
+      <button class="btn-settle" onclick="settleDay()">📊 結算今日</button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card income">
+      <div class="stat-label">今日收款</div>
+      <div class="stat-value" id="s-income">0</div>
+      <div class="stat-sub" id="s-income-count">0 筆</div>
+    </div>
+    <div class="stat-card expense">
+      <div class="stat-label">今日匯款</div>
+      <div class="stat-value" id="s-expense">0</div>
+      <div class="stat-sub" id="s-expense-count">0 筆</div>
+    </div>
+    <div class="stat-card fee">
+      <div class="stat-label">今日手續費</div>
+      <div class="stat-value" id="s-fee">0</div>
+      <div class="stat-sub" id="s-fee-sub">無手續費</div>
+    </div>
+    <div class="stat-card profit">
+      <div class="stat-label">今日利潤</div>
+      <div class="stat-value" id="s-profit">0</div>
+      <div class="stat-sub">收款+匯款利潤合計</div>
+    </div>
+    <div class="stat-card count">
+      <div class="stat-label">今日筆數</div>
+      <div class="stat-value" id="s-today">0</div>
+      <div class="stat-sub">尚未結算</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="input-panel">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-dot income-dot"></div>
+          <h2>收款登記</h2>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <label class="form-label">收款銀行</label>
+            <select class="form-select" id="in-bank">
+              <option value="">選擇銀行...</option>
+              <option>389 全支付</option>
+              <option>390 悠遊付</option>
+              <option>396 街口支付</option>
+              <option>700 中華郵政（郵局）</option>
+              <option>391 一卡通</option>
+              <option>048 王道銀行</option>
+              <option>826 樂天銀行</option>
+              <option>388 全盈支付</option>
+              <option>398 簡單付</option>
+            </select>
+          </div>
+          <div class="form-row-2">
+            <div class="form-row">
+              <label class="form-label">收款金額</label>
+              <input class="form-input" id="in-amount" type="number" step="0.01" placeholder="0.00" />
+            </div>
+            <div class="form-row">
+              <label class="form-label">利潤</label>
+              <input class="form-input" id="in-profit" type="number" step="0.01" placeholder="0.00" />
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="form-label">備註（選填）</label>
+            <input class="form-input" id="in-note" type="text" placeholder="例：單號或備忘" />
+          </div>
+          <button class="btn-submit btn-income" id="btn-income" onclick="addRecord('income')">📥 登記收款</button>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-dot expense-dot"></div>
+          <h2>匯款登記</h2>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <label class="form-label">匯款銀行</label>
+            <select class="form-select" id="out-bank">
+              <option value="">選擇銀行...</option>
+              <option>389 全支付</option>
+              <option>390 悠遊付</option>
+              <option>396 街口支付</option>
+              <option>700 中華郵政（郵局）</option>
+              <option>391 一卡通</option>
+              <option>048 王道銀行</option>
+              <option>826 樂天銀行</option>
+              <option>388 全盈支付</option>
+              <option>398 簡單付</option>
+              <option>➕ 自存</option>
+              <option>👩 老媽代轉</option>
+            </select>
+          </div>
+          <div class="form-row-3">
+            <div class="form-row">
+              <label class="form-label">匯款金額</label>
+              <input class="form-input" id="out-amount" type="number" step="0.01" placeholder="0.00" />
+            </div>
+            <div class="form-row">
+              <label class="form-label">利潤</label>
+              <input class="form-input" id="out-profit" type="number" step="0.01" placeholder="0.00" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" style="color:var(--fee)">手續費</label>
+              <input class="form-input" id="out-fee" type="number" step="0.01" placeholder="0.00" style="border-color:#f9731622;" />
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="form-label">備註（選填）</label>
+            <input class="form-input" id="out-note" type="text" placeholder="選填" />
+          </div>
+          <button class="btn-submit btn-expense" id="btn-expense" onclick="addRecord('expense')">📤 登記匯款</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="records-panel">
+      <div class="panel-card" style="flex:1">
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('records', this)">📋 今日明細</button>
+          <button class="tab-btn" onclick="switchTab('banks', this)">🏦 銀行統計</button>
+          <button class="tab-btn" onclick="switchTab('balance', this)">💰 銀行餘額</button>
+          <button class="tab-btn" onclick="switchTab('history', this)">📅 歷史結算</button>
+        </div>
+
+        <div class="tab-content active" id="tab-records">
+          <div class="records-list" id="record-list"><div class="empty-state"><div class="empty-icon">⏳</div>連線中...</div></div>
+          <div class="records-footer">
+            <span style="font-size:11px;color:var(--muted)">📱 電腦手機即時同步</span>
+            <button class="btn-clear" onclick="clearToday()">🗑 清除今日</button>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-banks">
+          <div style="padding:14px 18px 6px;font-size:11px;color:var(--teal);font-weight:700;letter-spacing:1px;">📥 收款銀行統計</div>
+          <div class="bank-stats-grid" id="bank-grid-income"></div>
+          <div style="padding:6px 18px 6px;font-size:11px;color:var(--red);font-weight:700;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px;">📤 匯款銀行統計</div>
+          <div class="bank-stats-grid" id="bank-grid-expense"></div>
+        </div>
+
+        <div class="tab-content" id="tab-balance">
+          <div style="padding:14px 18px 6px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:1px;">💰 各銀行餘額</span>
+            <span style="font-size:10px;color:var(--muted)">收款+利潤加餘額，匯款+手續費扣餘額</span>
+          </div>
+          <div class="balance-grid" id="balance-grid"></div>
+        </div>
+
+        <div class="tab-content" id="tab-history">
+          <div class="history-list" id="history-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+  import { getDatabase, ref, push, remove, onValue, set, runTransaction } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDzzUTPhI6ZzieaOUbEzIF3D_mYi6Nd5bU",
+    authDomain: "mega-ledger.firebaseapp.com",
+    databaseURL: "https://mega-ledger-default-rtdb.firebaseio.com",
+    projectId: "mega-ledger",
+    storageBucket: "mega-ledger.firebasestorage.app",
+    messagingSenderId: "1052333417630",
+    appId: "1:1052333417630:web:ec8112e535c0291f36c78f"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const RECORDS_PATH = 'ledger1/records';
+  const HISTORY_PATH = 'ledger1/history';
+  const BALANCES_PATH = 'ledger1/balances';
+
+  const ALL_BANKS = ['389 全支付','390 悠遊付','396 街口支付','700 中華郵政（郵局）','391 一卡通','048 王道銀行','826 樂天銀行','388 全盈支付','398 簡單付'];
+
+  function bKey(name) { return name.replace(/[.$#[\]/ ]/g, '_'); }
+
+  const connRef = ref(db, '.info/connected');
+  onValue(connRef, (snap) => {
+    const el = document.getElementById('sync-status');
+    if (snap.val()) { el.textContent = '🟢 已同步'; el.className = 'sync-status online'; }
+    else { el.textContent = '🔴 離線中'; el.className = 'sync-status offline'; }
+  });
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent = now.toLocaleTimeString('zh-TW');
+    document.getElementById('today-str').textContent = now.toLocaleDateString('zh-TW', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+  }
+  updateClock(); setInterval(updateClock, 1000);
+
+  function fmt(n) { return Number(n).toLocaleString('zh-TW', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+
+  let currentRecords = {};
+  onValue(ref(db, RECORDS_PATH), (snap) => { currentRecords = snap.val() || {}; render(); });
+
+  let currentHistory = [];
+  onValue(ref(db, HISTORY_PATH), (snap) => {
+    const data = snap.val() || {};
+    currentHistory = Object.values(data).sort((a,b) => b.id - a.id);
+    renderHistory();
+  });
+
+  let currentBalances = {};
+  onValue(ref(db, BALANCES_PATH), (snap) => { currentBalances = snap.val() || {}; renderBalances(); });
+
+  window.addRecord = async function(type) {
+    const bank = document.getElementById(type==='income'?'in-bank':'out-bank').value;
+    const amount = parseFloat(document.getElementById(type==='income'?'in-amount':'out-amount').value) || 0;
+    const profit = parseFloat(document.getElementById(type==='income'?'in-profit':'out-profit').value) || 0;
+    const fee = type==='expense' ? (parseFloat(document.getElementById('out-fee').value) || 0) : 0;
+    const note = document.getElementById(type==='income'?'in-note':'out-note').value.trim();
+    if (!bank) { showToast('請選擇銀行！', true); return; }
+    if (!amount) { showToast('請輸入金額！', true); return; }
+
+    const btn = document.getElementById(type==='income'?'btn-income':'btn-expense');
+    btn.disabled = true;
+    try {
+      await push(ref(db, RECORDS_PATH), { id:Date.now(), type, bank, amount, profit, fee, note, time:new Date().toLocaleString('zh-TW') });
+      // 收款: +amount +profit；匯款: -amount +profit -fee
+      const delta = type==='income' ? (amount + profit) : (profit - amount - fee);
+      await runTransaction(ref(db, BALANCES_PATH+'/'+bKey(bank)), (cur) => (cur||0) + delta);
+      if (type==='income') {
+        document.getElementById('in-bank').value=''; document.getElementById('in-amount').value='';
+        document.getElementById('in-profit').value=''; document.getElementById('in-note').value='';
+      } else {
+        document.getElementById('out-bank').value=''; document.getElementById('out-amount').value='';
+        document.getElementById('out-profit').value=''; document.getElementById('out-fee').value='';
+        document.getElementById('out-note').value='';
+      }
+      showToast(type==='income'?'✅ 收款已登記！':'✅ 匯款已登記！');
+    } catch(e) { showToast('儲存失敗，請檢查網路！', true); }
+    btn.disabled = false;
+  };
+
+  window.deleteRecord = async function(key) {
+    const r = currentRecords[key];
+    if (r) {
+      const delta = r.type==='income' ? -(r.amount + (r.profit||0)) : (r.amount + (r.fee||0) - (r.profit||0));
+      await runTransaction(ref(db, BALANCES_PATH+'/'+bKey(r.bank)), (cur) => (cur||0) + delta);
+    }
+    await remove(ref(db, RECORDS_PATH+'/'+key));
+  };
+
+  window.clearToday = async function() {
+    if (!confirm('確定要清除今日所有記錄嗎？\n銀行餘額將一併還原。')) return;
+    for (const r of Object.values(currentRecords)) {
+      const delta = r.type==='income' ? -(r.amount + (r.profit||0)) : (r.amount + (r.fee||0) - (r.profit||0));
+      await runTransaction(ref(db, BALANCES_PATH+'/'+bKey(r.bank)), (cur) => (cur||0) + delta);
+    }
+    await set(ref(db, RECORDS_PATH), null);
+  };
+
+  window.settleDay = async function() {
+    const records = Object.entries(currentRecords);
+    if (records.length===0) { showToast('今日尚無記錄！', true); return; }
+    const dateStr = new Date().toLocaleDateString('zh-TW');
+    if (!confirm(`確定結算 ${dateStr} 的帳？\n結算後今日記錄清空，統計與餘額快照存入歷史。`)) return;
+
+    const recs = records.map(([k,v]) => v);
+    const income = recs.filter(r => r.type==='income');
+    const expense = recs.filter(r => r.type==='expense');
+    const totalIncome = income.reduce((s,r) => s+r.amount, 0);
+    const totalExpense = expense.reduce((s,r) => s+r.amount, 0);
+    const totalProfit = recs.reduce((s,r) => s+r.profit, 0);
+    const totalFee = expense.reduce((s,r) => s+(r.fee||0), 0);
+
+    const incomeBankMap = {};
+    income.forEach(r => {
+      if (!incomeBankMap[r.bank]) incomeBankMap[r.bank] = { amount:0, profit:0, count:0 };
+      incomeBankMap[r.bank].amount+=r.amount; incomeBankMap[r.bank].profit+=r.profit; incomeBankMap[r.bank].count++;
+    });
+
+    const expenseBankMap = {};
+    expense.forEach(r => {
+      if (!expenseBankMap[r.bank]) expenseBankMap[r.bank] = { amount:0, profit:0, fee:0, count:0 };
+      expenseBankMap[r.bank].amount+=r.amount; expenseBankMap[r.bank].profit+=r.profit;
+      expenseBankMap[r.bank].fee+=(r.fee||0); expenseBankMap[r.bank].count++;
+    });
+
+    const balanceSnapshot = {};
+    ALL_BANKS.forEach(bank => { balanceSnapshot[bank] = currentBalances[bKey(bank)] || 0; });
+
+    await push(ref(db, HISTORY_PATH), {
+      id:Date.now(), date:dateStr,
+      totalIncome, totalExpense, totalFee, totalProfit,
+      incomeCount:income.length, expenseCount:expense.length,
+      incomeBankMap, expenseBankMap, balanceSnapshot
+    });
+    await set(ref(db, RECORDS_PATH), null);
+    showToast(`✅ ${dateStr} 結算完成！`);
+  };
+
+  function render() {
+    const records = Object.entries(currentRecords).map(([k,v]) => ({...v,_key:k})).sort((a,b) => b.id-a.id);
+    const income = records.filter(r => r.type==='income');
+    const expense = records.filter(r => r.type==='expense');
+    const totalIncome = income.reduce((s,r) => s+r.amount, 0);
+    const totalExpense = expense.reduce((s,r) => s+r.amount, 0);
+    const totalProfit = records.reduce((s,r) => s+r.profit, 0);
+    const totalFee = expense.reduce((s,r) => s+(r.fee||0), 0);
+    const feeCount = expense.filter(r => r.fee>0).length;
+
+    document.getElementById('s-income').textContent = fmt(totalIncome);
+    document.getElementById('s-expense').textContent = fmt(totalExpense);
+    document.getElementById('s-fee').textContent = fmt(totalFee);
+    document.getElementById('s-fee-sub').textContent = feeCount>0 ? feeCount+' 筆含手續費' : '無手續費';
+    document.getElementById('s-profit').textContent = fmt(totalProfit);
+    document.getElementById('s-income-count').textContent = income.length+' 筆';
+    document.getElementById('s-expense-count').textContent = expense.length+' 筆';
+    document.getElementById('s-today').textContent = records.length;
+
+    const listEl = document.getElementById('record-list');
+    listEl.innerHTML = records.length===0
+      ? '<div class="empty-state"><div class="empty-icon">📭</div>尚無記錄</div>'
+      : records.map(r => `
+        <div class="record-item">
+          <div class="record-type-dot ${r.type}"></div>
+          <div class="record-info">
+            <div class="record-bank">${r.bank}</div>
+            <div class="record-meta">${r.time}${r.note?' · '+r.note:''}</div>
+          </div>
+          <div class="record-numbers">
+            <div class="record-amount ${r.type}">${r.type==='income'?'+':'-'}${fmt(r.amount)}</div>
+            <div class="record-profit">利潤 +${fmt(r.profit)}</div>
+            ${r.fee?`<div class="record-fee">手續費 -${fmt(r.fee)}</div>`:''}
+          </div>
+          <div class="record-del" onclick="deleteRecord('${r._key}')" title="刪除">✕</div>
+        </div>`).join('');
+
+    const incomeMap = {};
+    income.forEach(r => {
+      if (!incomeMap[r.bank]) incomeMap[r.bank] = { amount:0, profit:0, count:0 };
+      incomeMap[r.bank].amount+=r.amount; incomeMap[r.bank].profit+=r.profit; incomeMap[r.bank].count++;
+    });
+    document.getElementById('bank-grid-income').innerHTML = Object.keys(incomeMap).length===0
+      ? '<div class="empty-state" style="grid-column:1/-1;padding:16px 0">尚無收款資料</div>'
+      : Object.keys(incomeMap).sort((a,b)=>incomeMap[b].amount-incomeMap[a].amount).map(bank=>`
+        <div class="bank-chip">
+          <div class="bank-chip-name">${bank}</div>
+          <div class="bank-chip-amount">${fmt(incomeMap[bank].amount)}</div>
+          <div class="bank-chip-profit">+${fmt(incomeMap[bank].profit)} (${incomeMap[bank].count}筆)</div>
+        </div>`).join('');
+
+    const expenseMap = {};
+    expense.forEach(r => {
+      if (!expenseMap[r.bank]) expenseMap[r.bank] = { amount:0, profit:0, fee:0, count:0 };
+      expenseMap[r.bank].amount+=r.amount; expenseMap[r.bank].profit+=r.profit;
+      expenseMap[r.bank].fee+=(r.fee||0); expenseMap[r.bank].count++;
+    });
+    document.getElementById('bank-grid-expense').innerHTML = Object.keys(expenseMap).length===0
+      ? '<div class="empty-state" style="grid-column:1/-1;padding:16px 0">尚無匯款資料</div>'
+      : Object.keys(expenseMap).sort((a,b)=>expenseMap[b].amount-expenseMap[a].amount).map(bank=>`
+        <div class="bank-chip" style="border-color:#ff4d6d33;">
+          <div class="bank-chip-name">${bank}</div>
+          <div class="bank-chip-amount" style="color:var(--red)">${fmt(expenseMap[bank].amount)}</div>
+          <div class="bank-chip-profit">+${fmt(expenseMap[bank].profit)}${expenseMap[bank].fee>0?' · 手續費 -'+fmt(expenseMap[bank].fee):''} (${expenseMap[bank].count}筆)</div>
+        </div>`).join('');
+  }
+
+  function renderBalances() {
+    const el = document.getElementById('balance-grid');
+    if (!el) return;
+    el.innerHTML = ALL_BANKS.map(bank => {
+      const k = bKey(bank);
+      const bal = currentBalances[k] || 0;
+      const cls = bal>0?'pos':bal<0?'neg':'zero';
+      return `<div class="balance-chip" id="bchip-${k}">
+        <div class="balance-chip-name">${bank}</div>
+        <div class="balance-chip-amount ${cls}">${fmt(bal)}</div>
+        <button class="btn-edit-bal" onclick="editBal('${k}','${bank}')">✏ 編輯</button>
+      </div>`;
+    }).join('');
+  }
+
+  window.editBal = function(k, bankName) {
+    const chip = document.getElementById('bchip-'+k);
+    const cur = currentBalances[k] || 0;
+    chip.innerHTML = `
+      <div class="balance-chip-name">${bankName}</div>
+      <input type="number" step="0.01" value="${cur}" id="bedit-${k}" class="form-input" style="margin:4px 0;font-size:12px;" />
+      <div style="display:flex;gap:4px;margin-top:4px;">
+        <button class="btn-edit-bal" onclick="saveBal('${k}')" style="border-color:var(--teal);color:var(--teal);">✓ 儲存</button>
+        <button class="btn-edit-bal" onclick="renderBalances()">✕</button>
+      </div>`;
+    setTimeout(()=>document.getElementById('bedit-'+k)?.focus(), 40);
+  };
+
+  window.saveBal = async function(k) {
+    const input = document.getElementById('bedit-'+k);
+    if (!input) return;
+    await set(ref(db, BALANCES_PATH+'/'+k), parseFloat(input.value)||0);
+    showToast('✅ 餘額已更新！');
+  };
+
+  function renderHistory() {
+    const el = document.getElementById('history-list');
+    if (currentHistory.length===0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div>尚無結算記錄</div>';
+      return;
+    }
+    el.innerHTML = currentHistory.map((h,i) => {
+      const iLines = Object.keys(h.incomeBankMap||{}).map(b =>
+        `  收 ${b}：${fmt(h.incomeBankMap[b].amount)}（+${fmt(h.incomeBankMap[b].profit)}，${h.incomeBankMap[b].count}筆）`).join('\n');
+      const eLines = Object.keys(h.expenseBankMap||{}).map(b => {
+        const fe = h.expenseBankMap[b].fee||0;
+        return `  匯 ${b}：${fmt(h.expenseBankMap[b].amount)}（+${fmt(h.expenseBankMap[b].profit)}${fe>0?'，手續費-'+fmt(fe):''}，${h.expenseBankMap[b].count}筆）`;
+      }).join('\n');
+      const balLines = h.balanceSnapshot
+        ? '\n── 結算餘額快照 ──\n'+Object.keys(h.balanceSnapshot).map(b=>`  ${b}：${fmt(h.balanceSnapshot[b])}`).join('\n')
+        : '';
+      const feeTotal = h.totalFee||0;
+      return `
+        <div class="history-item" id="hi-${i}" onclick="toggleHistory(${i})">
+          <div class="history-top">
+            <div>
+              <div class="history-date">${h.date}</div>
+              <div class="history-summary">收款 ${h.incomeCount}筆 / 匯款 ${h.expenseCount}筆${feeTotal>0?' · 手續費 '+fmt(feeTotal):''}</div>
+            </div>
+            <div class="history-profit">+${fmt(h.totalProfit)}</div>
+          </div>
+          <div class="history-detail">收款：${fmt(h.totalIncome)}
+匯款：${fmt(h.totalExpense)}
+手續費：${fmt(feeTotal)}
+總利潤：${fmt(h.totalProfit)}
+${iLines}
+${eLines}${balLines}</div>
+        </div>`;
+    }).join('');
+  }
+
+  window.toggleHistory = function(i) { document.getElementById('hi-'+i).classList.toggle('expanded'); };
+
+  window.switchTab = function(tab, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+tab).classList.add('active');
+  };
+
+  function showToast(msg, isError=false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show'+(isError?' error':'');
+    setTimeout(()=>t.className='', 2500);
+  }
+</script>
+</body>
+</html>
