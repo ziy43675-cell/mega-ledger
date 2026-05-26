@@ -10,7 +10,7 @@
     --bg: #0a0e1a; --surface: #111827; --surface2: #1a2234; --border: #1e2d45;
     --teal: #00d4aa; --teal-dim: #00d4aa22; --red: #ff4d6d; --red-dim: #ff4d6d22;
     --gold: #f5c842; --text: #e8edf5; --muted: #4a6080; --success: #00e5a0; --orange: #fb923c;
-    --fee: #f97316;
+    --fee: #f97316; --withdraw: #818cf8;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100vh; overflow-x: hidden; }
@@ -28,7 +28,7 @@
   .sync-status.offline { background: #ff4d6d22; color: var(--red); border: 1px solid var(--red); }
   .btn-settle { padding: 10px 20px; background: linear-gradient(135deg, #d97706, #b45309); color: white; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; font-family: 'Noto Sans TC', sans-serif; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 16px #d9770633; }
   .btn-settle:hover { transform: translateY(-2px); }
-  .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stats-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 24px; }
   .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; position: relative; overflow: hidden; }
   .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
   .stat-card.income::before { background: var(--teal); }
@@ -36,6 +36,7 @@
   .stat-card.fee::before { background: var(--fee); }
   .stat-card.profit::before { background: var(--gold); }
   .stat-card.count::before { background: #7c8cf8; }
+  .stat-card.withdraw::before { background: var(--withdraw); }
   .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
   .stat-value { font-size: 18px; font-weight: 900; font-family: 'JetBrains Mono'; line-height: 1; }
   .stat-card.income .stat-value { color: var(--teal); }
@@ -43,6 +44,7 @@
   .stat-card.fee .stat-value { color: var(--fee); }
   .stat-card.profit .stat-value { color: var(--gold); }
   .stat-card.count .stat-value { color: #7c8cf8; }
+  .stat-card.withdraw .stat-value { color: var(--withdraw); }
   .stat-sub { font-size: 10px; color: var(--muted); margin-top: 6px; font-family: 'JetBrains Mono'; }
   .main-grid { display: grid; grid-template-columns: 360px 1fr; gap: 16px; }
   .input-panel { display: flex; flex-direction: column; gap: 12px; }
@@ -87,6 +89,8 @@
   .record-amount { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono'; }
   .record-amount.income { color: var(--teal); }
   .record-amount.expense { color: var(--red); }
+  .record-amount.withdraw { color: var(--withdraw); }
+  .record-type-dot.withdraw { background: var(--withdraw); }
   .record-profit { font-size: 11px; color: var(--success); font-family: 'JetBrains Mono'; }
   .record-fee { font-size: 10px; color: var(--fee); font-family: 'JetBrains Mono'; }
   .record-del { color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px; border-radius: 4px; transition: all 0.15s; flex-shrink: 0; }
@@ -156,6 +160,11 @@
       <div class="stat-label">今日利潤</div>
       <div class="stat-value" id="s-profit">0</div>
       <div class="stat-sub">收款+匯款利潤合計</div>
+    </div>
+    <div class="stat-card withdraw">
+      <div class="stat-label">今日提款</div>
+      <div class="stat-value" id="s-withdraw">0</div>
+      <div class="stat-sub" id="s-withdraw-count">0 筆</div>
     </div>
     <div class="stat-card count">
       <div class="stat-label">今日筆數</div>
@@ -250,6 +259,42 @@
           <button class="btn-submit btn-expense" id="btn-expense" onclick="addRecord('expense')">📤 登記匯款</button>
         </div>
       </div>
+
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-dot" style="background:var(--withdraw);box-shadow:0 0 8px var(--withdraw);"></div>
+          <h2>提款現金登記</h2>
+        </div>
+        <div class="panel-body">
+          <div class="form-row">
+            <label class="form-label">提款銀行</label>
+            <select class="form-select" id="wd-bank">
+              <option value="">選擇銀行...</option>
+              <option>826 樂天銀行</option>
+              <option>396 街口支付</option>
+              <option>390 悠遊付</option>
+              <option>037 將來銀行</option>
+              <option>048 王道銀行</option>
+              <option>391 一卡通</option>
+              <option>388 全盈支付</option>
+              <option>LINE Pay</option>
+              <option>連線銀行</option>
+              <option>398 簡單付</option>
+            </select>
+          </div>
+          <div class="form-row-2">
+            <div class="form-row">
+              <label class="form-label">提款金額</label>
+              <input class="form-input" id="wd-amount" type="number" step="0.01" placeholder="0.00" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" style="color:var(--fee)">手續費</label>
+              <input class="form-input" id="wd-fee" type="number" step="0.01" placeholder="0.00" style="border-color:#f9731622;" />
+            </div>
+          </div>
+          <button class="btn-submit" style="background:linear-gradient(135deg,#6d5ce7,#5b4bd5);color:white;" id="btn-withdraw" onclick="addWithdraw()">🏧 登記提款</button>
+        </div>
+      </div>
     </div>
 
     <div class="records-panel">
@@ -273,6 +318,8 @@
           <div class="bank-stats-grid" id="bank-grid-income"></div>
           <div style="padding:6px 18px 6px;font-size:11px;color:var(--red);font-weight:700;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px;">📤 匯款銀行統計</div>
           <div class="bank-stats-grid" id="bank-grid-expense"></div>
+          <div style="padding:6px 18px 6px;font-size:11px;color:var(--withdraw);font-weight:700;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px;">🏧 提款統計</div>
+          <div class="bank-stats-grid" id="bank-grid-withdraw"></div>
           <div style="padding:6px 18px 6px;font-size:11px;color:var(--fee);font-weight:700;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px;">💸 今日手續費明細</div>
           <div class="bank-stats-grid" id="bank-grid-fee"></div>
         </div>
@@ -357,6 +404,24 @@
     btn.disabled = false;
   };
 
+  window.addWithdraw = async function() {
+    const bank = document.getElementById('wd-bank').value;
+    const amount = parseFloat(document.getElementById('wd-amount').value) || 0;
+    const fee = parseFloat(document.getElementById('wd-fee').value) || 0;
+    if (!bank) { showToast('請選擇銀行！', true); return; }
+    if (!amount) { showToast('請輸入提款金額！', true); return; }
+    const btn = document.getElementById('btn-withdraw');
+    btn.disabled = true;
+    try {
+      await push(ref(db, RECORDS_PATH), { id:Date.now(), type:'withdraw', bank, amount, profit:0, fee, note:'', time:new Date().toLocaleString('zh-TW') });
+      document.getElementById('wd-bank').value='';
+      document.getElementById('wd-amount').value='';
+      document.getElementById('wd-fee').value='';
+      showToast('✅ 提款已登記！');
+    } catch(e) { showToast('儲存失敗，請檢查網路！', true); }
+    btn.disabled = false;
+  };
+
   window.deleteRecord = async function(key) {
     await remove(ref(db, RECORDS_PATH+'/'+key));
   };
@@ -375,10 +440,12 @@
     const recs = records.map(([k,v]) => v);
     const income = recs.filter(r => r.type==='income');
     const expense = recs.filter(r => r.type==='expense');
+    const withdraw = recs.filter(r => r.type==='withdraw');
     const totalIncome = income.reduce((s,r) => s+r.amount, 0);
     const totalExpense = expense.reduce((s,r) => s+r.amount, 0);
-    const totalProfit = recs.reduce((s,r) => s+r.profit, 0);
-    const totalFee = expense.reduce((s,r) => s+(r.fee||0), 0);
+    const totalWithdraw = withdraw.reduce((s,r) => s+r.amount, 0);
+    const totalProfit = [...income, ...expense].reduce((s,r) => s+(r.profit||0), 0);
+    const totalFee = [...expense, ...withdraw].reduce((s,r) => s+(r.fee||0), 0);
 
     const incomeBankMap = {};
     income.forEach(r => {
@@ -393,11 +460,17 @@
       expenseBankMap[r.bank].fee+=(r.fee||0); expenseBankMap[r.bank].count++;
     });
 
+    const withdrawBankMap = {};
+    withdraw.forEach(r => {
+      if (!withdrawBankMap[r.bank]) withdrawBankMap[r.bank] = { amount:0, fee:0, count:0 };
+      withdrawBankMap[r.bank].amount+=r.amount; withdrawBankMap[r.bank].fee+=(r.fee||0); withdrawBankMap[r.bank].count++;
+    });
+
     await push(ref(db, HISTORY_PATH), {
       id:Date.now(), date:dateStr,
-      totalIncome, totalExpense, totalFee, totalProfit,
-      incomeCount:income.length, expenseCount:expense.length,
-      incomeBankMap, expenseBankMap
+      totalIncome, totalExpense, totalWithdraw, totalFee, totalProfit,
+      incomeCount:income.length, expenseCount:expense.length, withdrawCount:withdraw.length,
+      incomeBankMap, expenseBankMap, withdrawBankMap
     });
     await set(ref(db, RECORDS_PATH), null);
     showToast(`✅ ${dateStr} 結算完成！`);
@@ -407,17 +480,21 @@
     const records = Object.entries(currentRecords).map(([k,v]) => ({...v,_key:k})).sort((a,b) => b.id-a.id);
     const income = records.filter(r => r.type==='income');
     const expense = records.filter(r => r.type==='expense');
+    const withdraw = records.filter(r => r.type==='withdraw');
     const totalIncome = income.reduce((s,r) => s+r.amount, 0);
     const totalExpense = expense.reduce((s,r) => s+r.amount, 0);
-    const totalProfit = records.reduce((s,r) => s+r.profit, 0);
-    const totalFee = expense.reduce((s,r) => s+(r.fee||0), 0);
-    const feeCount = expense.filter(r => r.fee>0).length;
+    const totalWithdraw = withdraw.reduce((s,r) => s+r.amount, 0);
+    const totalProfit = [...income, ...expense].reduce((s,r) => s+(r.profit||0), 0);
+    const totalFee = [...expense, ...withdraw].reduce((s,r) => s+(r.fee||0), 0);
+    const feeCount = [...expense, ...withdraw].filter(r => r.fee>0).length;
 
     document.getElementById('s-income').textContent = fmt(totalIncome);
     document.getElementById('s-expense').textContent = fmt(totalExpense);
     document.getElementById('s-fee').textContent = fmt(totalFee);
     document.getElementById('s-fee-sub').textContent = feeCount>0 ? feeCount+' 筆含手續費' : '無手續費';
     document.getElementById('s-profit').textContent = fmt(totalProfit);
+    document.getElementById('s-withdraw').textContent = fmt(totalWithdraw);
+    document.getElementById('s-withdraw-count').textContent = withdraw.length+' 筆';
     document.getElementById('s-income-count').textContent = income.length+' 筆';
     document.getElementById('s-expense-count').textContent = expense.length+' 筆';
     document.getElementById('s-today').textContent = records.length;
@@ -434,7 +511,7 @@
           </div>
           <div class="record-numbers">
             <div class="record-amount ${r.type}">${r.type==='income'?'+':'-'}${fmt(r.amount)}</div>
-            <div class="record-profit">利潤 +${fmt(r.profit)}</div>
+            ${r.type!=='withdraw'?`<div class="record-profit">利潤 +${fmt(r.profit||0)}</div>`:''}
             ${r.fee?`<div class="record-fee">手續費 -${fmt(r.fee)}</div>`:''}
           </div>
           <div class="record-del" onclick="deleteRecord('${r._key}')" title="刪除">✕</div>
@@ -469,8 +546,22 @@
           <div class="bank-chip-profit">+${fmt(expenseMap[bank].profit)}${expenseMap[bank].fee>0?' · 手續費 -'+fmt(expenseMap[bank].fee):''} (${expenseMap[bank].count}筆)</div>
         </div>`).join('');
 
+    const withdrawMap = {};
+    withdraw.forEach(r => {
+      if (!withdrawMap[r.bank]) withdrawMap[r.bank] = { amount:0, fee:0, count:0 };
+      withdrawMap[r.bank].amount+=r.amount; withdrawMap[r.bank].fee+=(r.fee||0); withdrawMap[r.bank].count++;
+    });
+    document.getElementById('bank-grid-withdraw').innerHTML = Object.keys(withdrawMap).length===0
+      ? '<div class="empty-state" style="grid-column:1/-1;padding:16px 0">今日無提款</div>'
+      : Object.keys(withdrawMap).sort((a,b)=>withdrawMap[b].amount-withdrawMap[a].amount).map(bank=>`
+        <div class="bank-chip" style="border-color:#818cf833;">
+          <div class="bank-chip-name">${bank}</div>
+          <div class="bank-chip-amount" style="color:var(--withdraw)">-${fmt(withdrawMap[bank].amount)}</div>
+          <div class="bank-chip-profit">${withdrawMap[bank].count}筆${withdrawMap[bank].fee>0?' · 手續費 -'+fmt(withdrawMap[bank].fee):''}</div>
+        </div>`).join('');
+
     const feeMap = {};
-    expense.forEach(r => {
+    [...expense, ...withdraw].forEach(r => {
       if ((r.fee||0) > 0) {
         if (!feeMap[r.bank]) feeMap[r.bank] = { fee:0, count:0 };
         feeMap[r.bank].fee += r.fee; feeMap[r.bank].count++;
@@ -500,21 +591,27 @@
         return `  匯 ${b}：${fmt(h.expenseBankMap[b].amount)}（+${fmt(h.expenseBankMap[b].profit)}${fe>0?'，手續費-'+fmt(fe):''}，${h.expenseBankMap[b].count}筆）`;
       }).join('\n');
       const feeTotal = h.totalFee||0;
+      const wdTotal = h.totalWithdraw||0;
+      const wLines = Object.keys(h.withdrawBankMap||{}).map(b => {
+        const wf = h.withdrawBankMap[b].fee||0;
+        return `  提 ${b}：${fmt(h.withdrawBankMap[b].amount)}${wf>0?'（手續費-'+fmt(wf)+'）':''}，${h.withdrawBankMap[b].count}筆`;
+      }).join('\n');
       return `
         <div class="history-item" id="hi-${i}" onclick="toggleHistory(${i})">
           <div class="history-top">
             <div>
               <div class="history-date">${h.date}</div>
-              <div class="history-summary">收款 ${h.incomeCount}筆 / 匯款 ${h.expenseCount}筆${feeTotal>0?' · 手續費 '+fmt(feeTotal):''}</div>
+              <div class="history-summary">收款 ${h.incomeCount}筆 / 匯款 ${h.expenseCount}筆${h.withdrawCount>0?' / 提款 '+h.withdrawCount+'筆':''}${feeTotal>0?' · 手續費 '+fmt(feeTotal):''}</div>
             </div>
             <div class="history-profit">+${fmt(h.totalProfit)}</div>
           </div>
           <div class="history-detail">收款：${fmt(h.totalIncome)}
 匯款：${fmt(h.totalExpense)}
+提款：${fmt(wdTotal)}
 手續費：${fmt(feeTotal)}
 總利潤：${fmt(h.totalProfit)}
 ${iLines}
-${eLines}</div>
+${eLines}${wLines?'\n'+wLines:''}</div>
         </div>`;
     }).join('');
   }
