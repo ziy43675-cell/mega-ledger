@@ -112,20 +112,11 @@
   .tab-btn.active { background: var(--teal-dim); border-color: var(--teal); color: var(--teal); }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
-  .balance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px 18px 16px; }
-  .balance-chip { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
-  .balance-chip-name { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
-  .balance-chip-amount { font-size: 15px; font-weight: 700; font-family: 'JetBrains Mono'; margin-bottom: 6px; }
-  .balance-chip-amount.pos { color: var(--teal); }
-  .balance-chip-amount.neg { color: var(--red); }
-  .balance-chip-amount.zero { color: var(--muted); }
-  .btn-edit-bal { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; font-size: 10px; padding: 2px 8px; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; transition: all 0.15s; }
-  .btn-edit-bal:hover { border-color: var(--teal); color: var(--teal); }
   #toast { position: fixed; bottom: 28px; right: 28px; background: var(--surface); border: 1px solid var(--teal); border-radius: 10px; padding: 12px 20px; font-size: 13px; color: var(--teal); box-shadow: 0 8px 32px #00000055; transform: translateY(80px); opacity: 0; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 9999; font-weight: 600; }
   #toast.show { transform: translateY(0); opacity: 1; }
   #toast.error { border-color: var(--red); color: var(--red); }
   @media (max-width: 900px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 760px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .main-grid { grid-template-columns: 1fr; } .bank-stats-grid { grid-template-columns: repeat(2, 1fr); } .balance-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 760px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .main-grid { grid-template-columns: 1fr; } .bank-stats-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
 <body>
@@ -265,7 +256,6 @@
         <div class="tab-bar">
           <button class="tab-btn active" onclick="switchTab('records', this)">📋 今日明細</button>
           <button class="tab-btn" onclick="switchTab('banks', this)">🏦 銀行統計</button>
-          <button class="tab-btn" onclick="switchTab('balance', this)">💰 銀行餘額</button>
           <button class="tab-btn" onclick="switchTab('history', this)">📅 歷史結算</button>
         </div>
 
@@ -282,14 +272,8 @@
           <div class="bank-stats-grid" id="bank-grid-income"></div>
           <div style="padding:6px 18px 6px;font-size:11px;color:var(--red);font-weight:700;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px;">📤 匯款銀行統計</div>
           <div class="bank-stats-grid" id="bank-grid-expense"></div>
-        </div>
-
-        <div class="tab-content" id="tab-balance">
-          <div style="padding:14px 18px 6px;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:1px;">💰 各銀行餘額</span>
-            <span style="font-size:10px;color:var(--muted)">收款+利潤加餘額，匯款+手續費扣餘額</span>
-          </div>
-          <div class="balance-grid" id="balance-grid"></div>
+          <div style="padding:6px 18px 6px;font-size:11px;color:var(--fee);font-weight:700;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px;">💸 今日手續費明細</div>
+          <div class="bank-stats-grid" id="bank-grid-fee"></div>
         </div>
 
         <div class="tab-content" id="tab-history">
@@ -304,7 +288,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-  import { getDatabase, ref, push, remove, onValue, set, runTransaction } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+  import { getDatabase, ref, push, remove, onValue, set } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDzzUTPhI6ZzieaOUbEzIF3D_mYi6Nd5bU",
@@ -320,12 +304,6 @@
   const db = getDatabase(app);
   const RECORDS_PATH = 'ledger1/records';
   const HISTORY_PATH = 'ledger1/history';
-  const BALANCES_PATH = 'ledger1/balances';
-
-  const ALL_BANKS = ['389 全支付','390 悠遊付','396 街口支付','700 中華郵政（郵局）','391 一卡通','048 王道銀行','826 樂天銀行','388 全盈支付','398 簡單付'];
-
-  function bKey(name) { return name.replace(/[.$#[\]/ ]/g, '_'); }
-
   const connRef = ref(db, '.info/connected');
   onValue(connRef, (snap) => {
     const el = document.getElementById('sync-status');
@@ -352,9 +330,6 @@
     renderHistory();
   });
 
-  let currentBalances = {};
-  onValue(ref(db, BALANCES_PATH), (snap) => { currentBalances = snap.val() || {}; renderBalances(); });
-
   window.addRecord = async function(type) {
     const bank = document.getElementById(type==='income'?'in-bank':'out-bank').value;
     const amount = parseFloat(document.getElementById(type==='income'?'in-amount':'out-amount').value) || 0;
@@ -368,9 +343,6 @@
     btn.disabled = true;
     try {
       await push(ref(db, RECORDS_PATH), { id:Date.now(), type, bank, amount, profit, fee, note, time:new Date().toLocaleString('zh-TW') });
-      // 收款: +amount +profit；匯款: -amount +profit -fee
-      const delta = type==='income' ? (amount + profit) : (profit - amount - fee);
-      await runTransaction(ref(db, BALANCES_PATH+'/'+bKey(bank)), (cur) => (cur||0) + delta);
       if (type==='income') {
         document.getElementById('in-bank').value=''; document.getElementById('in-amount').value='';
         document.getElementById('in-profit').value=''; document.getElementById('in-note').value='';
@@ -385,20 +357,11 @@
   };
 
   window.deleteRecord = async function(key) {
-    const r = currentRecords[key];
-    if (r) {
-      const delta = r.type==='income' ? -(r.amount + (r.profit||0)) : (r.amount + (r.fee||0) - (r.profit||0));
-      await runTransaction(ref(db, BALANCES_PATH+'/'+bKey(r.bank)), (cur) => (cur||0) + delta);
-    }
     await remove(ref(db, RECORDS_PATH+'/'+key));
   };
 
   window.clearToday = async function() {
-    if (!confirm('確定要清除今日所有記錄嗎？\n銀行餘額將一併還原。')) return;
-    for (const r of Object.values(currentRecords)) {
-      const delta = r.type==='income' ? -(r.amount + (r.profit||0)) : (r.amount + (r.fee||0) - (r.profit||0));
-      await runTransaction(ref(db, BALANCES_PATH+'/'+bKey(r.bank)), (cur) => (cur||0) + delta);
-    }
+    if (!confirm('確定要清除今日所有記錄嗎？')) return;
     await set(ref(db, RECORDS_PATH), null);
   };
 
@@ -406,7 +369,7 @@
     const records = Object.entries(currentRecords);
     if (records.length===0) { showToast('今日尚無記錄！', true); return; }
     const dateStr = new Date().toLocaleDateString('zh-TW');
-    if (!confirm(`確定結算 ${dateStr} 的帳？\n結算後今日記錄清空，統計與餘額快照存入歷史。`)) return;
+    if (!confirm(`確定結算 ${dateStr} 的帳？\n結算後今日記錄清空，統計存入歷史。`)) return;
 
     const recs = records.map(([k,v]) => v);
     const income = recs.filter(r => r.type==='income');
@@ -429,14 +392,11 @@
       expenseBankMap[r.bank].fee+=(r.fee||0); expenseBankMap[r.bank].count++;
     });
 
-    const balanceSnapshot = {};
-    ALL_BANKS.forEach(bank => { balanceSnapshot[bank] = currentBalances[bKey(bank)] || 0; });
-
     await push(ref(db, HISTORY_PATH), {
       id:Date.now(), date:dateStr,
       totalIncome, totalExpense, totalFee, totalProfit,
       incomeCount:income.length, expenseCount:expense.length,
-      incomeBankMap, expenseBankMap, balanceSnapshot
+      incomeBankMap, expenseBankMap
     });
     await set(ref(db, RECORDS_PATH), null);
     showToast(`✅ ${dateStr} 結算完成！`);
@@ -507,42 +467,23 @@
           <div class="bank-chip-amount" style="color:var(--red)">${fmt(expenseMap[bank].amount)}</div>
           <div class="bank-chip-profit">+${fmt(expenseMap[bank].profit)}${expenseMap[bank].fee>0?' · 手續費 -'+fmt(expenseMap[bank].fee):''} (${expenseMap[bank].count}筆)</div>
         </div>`).join('');
+
+    const feeMap = {};
+    expense.forEach(r => {
+      if ((r.fee||0) > 0) {
+        if (!feeMap[r.bank]) feeMap[r.bank] = { fee:0, count:0 };
+        feeMap[r.bank].fee += r.fee; feeMap[r.bank].count++;
+      }
+    });
+    document.getElementById('bank-grid-fee').innerHTML = Object.keys(feeMap).length===0
+      ? '<div class="empty-state" style="grid-column:1/-1;padding:16px 0">今日無手續費</div>'
+      : Object.keys(feeMap).sort((a,b)=>feeMap[b].fee-feeMap[a].fee).map(bank=>`
+        <div class="bank-chip" style="border-color:#f9731633;">
+          <div class="bank-chip-name">${bank}</div>
+          <div class="bank-chip-amount" style="color:var(--fee)">-${fmt(feeMap[bank].fee)}</div>
+          <div class="bank-chip-profit">${feeMap[bank].count}筆含手續費</div>
+        </div>`).join('');
   }
-
-  function renderBalances() {
-    const el = document.getElementById('balance-grid');
-    if (!el) return;
-    el.innerHTML = ALL_BANKS.map(bank => {
-      const k = bKey(bank);
-      const bal = currentBalances[k] || 0;
-      const cls = bal>0?'pos':bal<0?'neg':'zero';
-      return `<div class="balance-chip" id="bchip-${k}">
-        <div class="balance-chip-name">${bank}</div>
-        <div class="balance-chip-amount ${cls}">${fmt(bal)}</div>
-        <button class="btn-edit-bal" onclick="editBal('${k}','${bank}')">✏ 編輯</button>
-      </div>`;
-    }).join('');
-  }
-
-  window.editBal = function(k, bankName) {
-    const chip = document.getElementById('bchip-'+k);
-    const cur = currentBalances[k] || 0;
-    chip.innerHTML = `
-      <div class="balance-chip-name">${bankName}</div>
-      <input type="number" step="0.01" value="${cur}" id="bedit-${k}" class="form-input" style="margin:4px 0;font-size:12px;" />
-      <div style="display:flex;gap:4px;margin-top:4px;">
-        <button class="btn-edit-bal" onclick="saveBal('${k}')" style="border-color:var(--teal);color:var(--teal);">✓ 儲存</button>
-        <button class="btn-edit-bal" onclick="renderBalances()">✕</button>
-      </div>`;
-    setTimeout(()=>document.getElementById('bedit-'+k)?.focus(), 40);
-  };
-
-  window.saveBal = async function(k) {
-    const input = document.getElementById('bedit-'+k);
-    if (!input) return;
-    await set(ref(db, BALANCES_PATH+'/'+k), parseFloat(input.value)||0);
-    showToast('✅ 餘額已更新！');
-  };
 
   function renderHistory() {
     const el = document.getElementById('history-list');
@@ -557,9 +498,6 @@
         const fe = h.expenseBankMap[b].fee||0;
         return `  匯 ${b}：${fmt(h.expenseBankMap[b].amount)}（+${fmt(h.expenseBankMap[b].profit)}${fe>0?'，手續費-'+fmt(fe):''}，${h.expenseBankMap[b].count}筆）`;
       }).join('\n');
-      const balLines = h.balanceSnapshot
-        ? '\n── 結算餘額快照 ──\n'+Object.keys(h.balanceSnapshot).map(b=>`  ${b}：${fmt(h.balanceSnapshot[b])}`).join('\n')
-        : '';
       const feeTotal = h.totalFee||0;
       return `
         <div class="history-item" id="hi-${i}" onclick="toggleHistory(${i})">
@@ -575,7 +513,7 @@
 手續費：${fmt(feeTotal)}
 總利潤：${fmt(h.totalProfit)}
 ${iLines}
-${eLines}${balLines}</div>
+${eLines}</div>
         </div>`;
     }).join('');
   }
