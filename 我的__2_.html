@@ -653,6 +653,97 @@ ${eLines}${wLines?'\n'+wLines:''}</div>
     t.className = 'show'+(isError?' error':'');
     setTimeout(()=>t.className='', 2500);
   }
+
+  const MONTHLY_PATH = 'ledger1/monthly';
+  let currentMonthly = [];
+  onValue(ref(db, MONTHLY_PATH), (snap) => {
+    const data = snap.val() || {};
+    currentMonthly = Object.values(data).sort((a,b) => b.id - a.id);
+    renderMonthly();
+  });
+
+  window.settleMonth = async function() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const monthRecords = currentHistory.filter(h => {
+      const match = h.date.match(/(\d{4})[\/年](\d{1,2})/);
+      return match && parseInt(match[1])===year && parseInt(match[2])===month;
+    });
+    if (monthRecords.length===0) { showToast(`${year}年${month}月尚無每日結算記錄！`, true); return; }
+    const already = currentMonthly.some(m => m.year===year && m.monthNum===month);
+    if (already && !confirm(`${year}年${month}月已有月結記錄，確定再新增一筆？`)) return;
+    if (!confirm(`確定月結 ${year}年${month}月？\n共 ${monthRecords.length} 天的資料。`)) return;
+    const totalIncome = monthRecords.reduce((s,h) => s+(h.totalIncome||0), 0);
+    const totalExpense = monthRecords.reduce((s,h) => s+(h.totalExpense||0), 0);
+    const totalWithdraw = monthRecords.reduce((s,h) => s+(h.totalWithdraw||0), 0);
+    const totalFee = monthRecords.reduce((s,h) => s+(h.totalFee||0), 0);
+    const totalProfit = monthRecords.reduce((s,h) => s+(h.totalProfit||0), 0);
+    const incomeCount = monthRecords.reduce((s,h) => s+(h.incomeCount||0), 0);
+    const expenseCount = monthRecords.reduce((s,h) => s+(h.expenseCount||0), 0);
+    const withdrawCount = monthRecords.reduce((s,h) => s+(h.withdrawCount||0), 0);
+    const incomeBankMap={}, expenseBankMap={}, withdrawBankMap={};
+    monthRecords.forEach(h => {
+      Object.entries(h.incomeBankMap||{}).forEach(([b,v]) => {
+        if (!incomeBankMap[b]) incomeBankMap[b]={amount:0,profit:0,count:0};
+        incomeBankMap[b].amount+=v.amount; incomeBankMap[b].profit+=v.profit; incomeBankMap[b].count+=v.count;
+      });
+      Object.entries(h.expenseBankMap||{}).forEach(([b,v]) => {
+        if (!expenseBankMap[b]) expenseBankMap[b]={amount:0,profit:0,fee:0,count:0};
+        expenseBankMap[b].amount+=v.amount; expenseBankMap[b].profit+=v.profit; expenseBankMap[b].fee+=(v.fee||0); expenseBankMap[b].count+=v.count;
+      });
+      Object.entries(h.withdrawBankMap||{}).forEach(([b,v]) => {
+        if (!withdrawBankMap[b]) withdrawBankMap[b]={amount:0,fee:0,count:0};
+        withdrawBankMap[b].amount+=v.amount; withdrawBankMap[b].fee+=(v.fee||0); withdrawBankMap[b].count+=v.count;
+      });
+    });
+    await push(ref(db, MONTHLY_PATH), {
+      id:Date.now(), month:`${year}年${month}月`, year, monthNum:month, days:monthRecords.length,
+      totalIncome, totalExpense, totalWithdraw, totalFee, totalProfit,
+      incomeCount, expenseCount, withdrawCount,
+      incomeBankMap, expenseBankMap, withdrawBankMap
+    });
+    showToast(`✅ ${year}年${month}月 月結完成！共 ${monthRecords.length} 天`);
+  };
+
+  function renderMonthly() {
+    const el = document.getElementById('monthly-list');
+    if (currentMonthly.length===0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">📆</div>尚無月結記錄</div>';
+      return;
+    }
+    el.innerHTML = currentMonthly.map((m,i) => {
+      const iLines = Object.keys(m.incomeBankMap||{}).map(b =>
+        `  收 ${b}：${fmt(m.incomeBankMap[b].amount)}（+${fmt(m.incomeBankMap[b].profit)}，${m.incomeBankMap[b].count}筆）`).join('\n');
+      const eLines = Object.keys(m.expenseBankMap||{}).map(b => {
+        const fe = m.expenseBankMap[b].fee||0;
+        return `  匯 ${b}：${fmt(m.expenseBankMap[b].amount)}（+${fmt(m.expenseBankMap[b].profit)}${fe>0?'，手續費-'+fmt(fe):''}，${m.expenseBankMap[b].count}筆）`;
+      }).join('\n');
+      const wLines = Object.keys(m.withdrawBankMap||{}).map(b => {
+        const wf = m.withdrawBankMap[b].fee||0;
+        return `  提 ${b}：${fmt(m.withdrawBankMap[b].amount)}${wf>0?'（手續費-'+fmt(wf)+'）':''}，${m.withdrawBankMap[b].count}筆`;
+      }).join('\n');
+      return `
+        <div class="monthly-item" id="mi-${i}" onclick="toggleMonthly(${i})">
+          <div class="monthly-top">
+            <div>
+              <div class="monthly-month">${m.month}（${m.days}天）</div>
+              <div class="monthly-summary">收款 ${m.incomeCount}筆 / 匯款 ${m.expenseCount}筆${m.withdrawCount>0?' / 提款 '+m.withdrawCount+'筆':''}${m.totalFee>0?' · 手續費 '+fmt(m.totalFee):''}</div>
+            </div>
+            <div class="monthly-profit">+${fmt(m.totalProfit)}</div>
+          </div>
+          <div class="monthly-detail">收款：${fmt(m.totalIncome)}
+匯款：${fmt(m.totalExpense)}
+提款：${fmt(m.totalWithdraw)}
+手續費：${fmt(m.totalFee)}
+總利潤：${fmt(m.totalProfit)}
+${iLines}
+${eLines}${wLines?'\n'+wLines:''}</div>
+        </div>`;
+    }).join('');
+  }
+
+  window.toggleMonthly = function(i) { document.getElementById('mi-'+i).classList.toggle('expanded'); };
 </script>
 </body>
 </html>
