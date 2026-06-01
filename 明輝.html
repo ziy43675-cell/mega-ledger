@@ -414,7 +414,7 @@
     if (!amount) { document.getElementById('in-profit').value = ''; return; }
     const base = amount >= 30000 ? 50 : amount >= 10000 ? 35 : 30;
     const raw = base + amount * 0.005;
-    document.getElementById('in-profit').value = Math.ceil(raw * 100) / 100;
+    document.getElementById('in-profit').value = Math.round(raw * 100) / 100;
   };
 
   window.addRecord = async function(type) {
